@@ -68,10 +68,10 @@ const float ACID_CONCENTRATION = 0.025;
 #define SS_NEOPIX 6
 #define SEESAW_ADDR 0x36
 
-#define STD_STIR_TIME         20 
-#define STD_STIR_TIME_PH6     25 
-#define STD_STIR_TIME_PH5     30 
-#define STD_STIR_TIME_PH4     40 
+#define STD_STIR_TIME         15 
+#define STD_STIR_TIME_PH6     20 
+#define STD_STIR_TIME_PH5     25 
+#define STD_STIR_TIME_PH4     30 
 
 Adafruit_seesaw ss;
 
@@ -239,7 +239,7 @@ void setup()
   // rtc.setDOW(SUNDAY);     // Set Day-of-Week to SUNDAY
   // rtc.setTime(18, 36, 30);     // Set the time to 12:00:00 (24hr format)
   // rtc.setDate(27, 8, 2023);   // Set the date to January 1st, 2014
-
+  
   Serial.println("");
   Serial.println("KH-MON: KH Guardian - Mega MCU started ....");
 
@@ -715,7 +715,7 @@ void runAlkalinityTest()
 {
   digitalWrite(PIN_VINT, HIGH);
   t = rtc.getTime();
-  byte t_year = (byte)(t.year - 2000);
+  //byte t_year = t.year;//(byte)(t.year - 2000);
   byte t_month = t.mon;
   byte t_day = t.date;
   byte t_hour = t.hour;
@@ -730,7 +730,7 @@ void runAlkalinityTest()
   float test_result[2][50];
   int iter_count = 0;
 
-  msg = "KH-MON: 20"+ String(t_year)+"-"; 
+  msg = "KH-MON: "+ String(t.year)+"-"; 
   if(t_month<10){msg = msg+"0";}
     msg = msg + String(t_month) + "-";
   if(t_day<10){msg = msg + "0";}
@@ -960,17 +960,24 @@ void runAlkalinityTest()
     dkh_std = getDKH(100, acid_std, ACID_CONCENTRATION);
   }
 
-  msg = "\nKH-MON: Test results - 20"+  String(t_year)+ "-";
-  if(t_month<10){msg = msg + "0";}
-    msg = msg + String(t_month) + "-";
-  if(t_day<10){msg = msg + "0";} 
-    msg = msg + String(t_day)+ " / ";
-  if(t_hour<10){msg = msg + "0";}
-    msg = msg + String(t_hour)+ ":";
-  if(t_min<10){msg = msg + "0";}
-    msg = msg + String(t_min);
-  msg = msg + "  DKH: " + String(dkh_std,2);
+  String date = String(t.year)+ "-";
+  if(t_month<10){date = date + "0";}
+    date = date + String(t_month) + "-";
+  if(t_day<10){date = date + "0";} 
+    date = date + String(t_day);
+
+  String time = "";
+  if(t_hour<10){time = time + "0";}
+    time = time + String(t_hour)+ ":";
+  if(t_min<10){msg = time + "0";}
+    time = time + String(t_min);
+
+  Serial.println("API:ph="+String(initial_ph,2)+"&kh="+ String(dkh_std,2)+"&date="+date+"&time="+time+"&");
+  delay(1000);
   
+  msg = "\nKH-MON: Test results - " + date + " / " + time;
+  
+  //msg = msg + "  DKH: " + String(dkh_std,2);
   // Serial.println(msg);
   // Serial.print("Step# : ACID VOL : PH");
 
@@ -983,6 +990,8 @@ void runAlkalinityTest()
 
   Serial.print(msg);
   Serial.println();
+  Serial.println("DKH: "+ String(dkh_std,2));
+  Serial.println("PH: "+String(initial_ph,2));
   Serial.print("\nReaction REAGENT used during the test: ");
   Serial.print(total_acid_added);
   Serial.println(" MLs");
