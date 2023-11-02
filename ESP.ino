@@ -307,8 +307,8 @@ void loop()
   }    
 
   current_time = millis();
-  if (first_start == true || (last_update_time == 0 && (current_time - startup_time > 15*1000))) //on startup - only send NTP time update after about 15 seconds delay
-  // if ((first_start == true && (current_time - last_update_time > time_update_interval)) || (last_update_time == 0 && (current_time - startup_time > 15*1000))) //on startup - only send NTP time update after about 15 seconds delay
+  // if (first_start == true || (last_update_time == 0 && (current_time - startup_time > 15*1000))) //on startup - only send NTP time update after about 15 seconds delay
+  if ((first_start == true && (current_time - last_update_time > time_update_interval)) || (last_update_time == 0 && (current_time - startup_time > 1*1000))) //on startup - only send NTP time update after about 15 seconds delay
   {
     first_start = false;
 
@@ -361,7 +361,7 @@ void loop()
 
         // if(result!="") {
         //   Serial.println(result);
-        //   // ESP.restart();
+        //   ESP.restart();
         // }
     }
   }
@@ -389,4 +389,4 @@ String getNTPTime() {
   Serial.print("Time string: ");
   Serial.println(asString);
   return asString;
-} 
+}  
