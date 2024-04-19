@@ -11,6 +11,7 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include <NTPClient.h>
+#include <HTTPClient.h>
 
 WiFiManager wifiMGR; //WiFiManager object , Local intialization. Once its business is done, there is no need to keep it around
 
@@ -120,6 +121,99 @@ const char* MyHostName = "KH-Guardian-Station"; // The name of your ESP device t
 unsigned long last_update_time = 0;
 unsigned long current_time;
 unsigned long startup_time;
+
+void WiFiEvent(WiFiEvent_t event)
+{
+    Serial.printf("[WiFi-event] event: %d\n", event);
+
+    switch (event) {
+        case ARDUINO_EVENT_WIFI_READY: 
+            Serial.println("WiFi interface ready");
+            break;
+        case ARDUINO_EVENT_WIFI_SCAN_DONE:
+            Serial.println("Completed scan for access points");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_START:
+            Serial.println("WiFi client started");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_STOP:
+            Serial.println("WiFi clients stopped");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+            Serial.println("Connected to access point");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+            Serial.println("Disconnected from WiFi access point");
+            Serial.println("Trying to Reconnect");
+            WiFi.disconnect();
+            WiFi.reconnect(); 
+            break;
+        case ARDUINO_EVENT_WIFI_STA_AUTHMODE_CHANGE:
+            Serial.println("Authentication mode of access point has changed");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            Serial.print("Obtained IP address: ");
+            Serial.println(WiFi.localIP());
+            break;
+        case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+            Serial.println("Lost IP address and IP address is reset to 0");
+            break;
+        case ARDUINO_EVENT_WPS_ER_SUCCESS:
+            Serial.println("WiFi Protected Setup (WPS): succeeded in enrollee mode");
+            break;
+        case ARDUINO_EVENT_WPS_ER_FAILED:
+            Serial.println("WiFi Protected Setup (WPS): failed in enrollee mode");
+            break;
+        case ARDUINO_EVENT_WPS_ER_TIMEOUT:
+            Serial.println("WiFi Protected Setup (WPS): timeout in enrollee mode");
+            break;
+        case ARDUINO_EVENT_WPS_ER_PIN:
+            Serial.println("WiFi Protected Setup (WPS): pin code in enrollee mode");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_START:
+            Serial.println("WiFi access point started");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_STOP:
+            Serial.println("WiFi access point  stopped");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
+            Serial.println("Client connected");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
+            Serial.println("Client disconnected");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:
+            Serial.println("Assigned IP address to client");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_PROBEREQRECVED:
+            Serial.println("Received probe request");
+            break;
+        case ARDUINO_EVENT_WIFI_AP_GOT_IP6:
+            Serial.println("AP IPv6 is preferred");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP6:
+            Serial.println("STA IPv6 is preferred");
+            break;
+        case ARDUINO_EVENT_ETH_GOT_IP6:
+            Serial.println("Ethernet IPv6 is preferred");
+            break;
+        case ARDUINO_EVENT_ETH_START:
+            Serial.println("Ethernet started");
+            break;
+        case ARDUINO_EVENT_ETH_STOP:
+            Serial.println("Ethernet stopped");
+            break;
+        case ARDUINO_EVENT_ETH_CONNECTED:
+            Serial.println("Ethernet connected");
+            break;
+        case ARDUINO_EVENT_ETH_DISCONNECTED:
+            Serial.println("Ethernet disconnected");
+            break;
+        case ARDUINO_EVENT_ETH_GOT_IP:
+            Serial.println("Obtained IP address");
+            break;
+        default: break;
+    }}
 
 // unsigned long time_update_interval = 12*3600*1000; //2 times a day
 unsigned long time_update_interval = 12*3600*1000; //24 times as day
@@ -294,7 +388,7 @@ void setup()
 
   delay(100);
   startup_time = millis();
-
+  WiFi.onEvent(WiFiEvent);
   // End Setup
 } 
 
@@ -302,9 +396,13 @@ bool first_start = true;
 
 void loop()
 {  
+  if (WiFi.status() == WL_DISCONNECTED){
+    ESP.restart();
+  }
   if (WiFi.status() != WL_CONNECTED) {
       digitalWrite(LED_BUILTIN, LOW);
       digitalWrite(LED_Connected, LOW);
+      delay(100);
       WiFi.disconnect();
       WiFi.reconnect();  
     } else {
@@ -346,6 +444,26 @@ void loop()
   
   if(message !="")
   {
+    if(message.indexOf("API:") !=-1){
+      int str_len1 = message.length() + 1;
+      char char_array1[str_len1];
+      message.toCharArray(char_array1, str_len1);
+      Serial.println("Try Send result");  
+      Serial.println(char_array1);  
+      HTTPClient http;
+
+
+      http.begin("https://spslink.net/save.php");
+
+      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+      // Data to send with HTTP POST
+      // Send HTTP POST request
+      int httpResponseCode = http.POST(char_array1);
+
+      Serial.print("HTTP Response code is: ");
+      Serial.println(httpResponseCode);
+      http.end();
+    }
     if(message.indexOf("KH-MON:")!=-1)
     {
         int str_len = message.length() + 1; 
