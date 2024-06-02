@@ -20,6 +20,13 @@ bool shouldSaveConfig = false ;
 // char emailString[50] = "KH.guardian.11@gmail.com" ;
 char emailString[50] = "KH-Guardian@outlook.com" ;
 
+/* Fill-in information from Blynk Device Info here */
+#define BLYNK_TEMPLATE_ID "TMPL2u9NW4Blh"
+#define BLYNK_TEMPLATE_NAME "KH"
+#define BLYNK_AUTH_TOKEN "3KTYu_cVHcIe5HzAfRxP4IgiiTaoQ75H"
+
+#include <BlynkSimpleEsp32.h>
+
 void saveConfigFile()
 {
   // Save data to JSON format
@@ -276,6 +283,7 @@ void Wifi_Status() {
     Serial.print("Successfully connected to Wifi: (< ");
     Serial.print(WiFi.SSID());
     Serial.println(" >)");
+    Blynk.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
   }
 
 
@@ -394,6 +402,24 @@ void setup()
 
 bool first_start = true;
 
+// Function to find the value of a specific parameter in the URL
+std::string getParamValue(const std::string& url, const std::string& paramName) {
+    std::string paramPattern = paramName + "=";
+    size_t paramStart = url.find(paramPattern);
+    if (paramStart == std::string::npos) {
+        return ""; // Parameter not found
+    }
+
+    paramStart += paramPattern.length();
+    size_t paramEnd = url.find("&", paramStart);
+    if (paramEnd == std::string::npos) {
+        paramEnd = url.length();
+    }
+
+    return url.substr(paramStart, paramEnd - paramStart);
+}
+
+
 void loop()
 {  
   if (WiFi.status() == WL_DISCONNECTED){
@@ -408,7 +434,8 @@ void loop()
     } else {
       digitalWrite(LED_BUILTIN, HIGH);
       digitalWrite(LED_Connected, HIGH);
-  }    
+  }
+  Blynk.run();
 
   current_time = millis();
   // if (first_start == true || (last_update_time == 0 && (current_time - startup_time > 15*1000))) //on startup - only send NTP time update after about 15 seconds delay
@@ -463,6 +490,15 @@ void loop()
       Serial.print("HTTP Response code is: ");
       Serial.println(httpResponseCode);
       http.end();
+
+      std::string urlString(char_array1);
+      
+      double ph = std::stod(getParamValue(urlString, "API:ph"));
+      double kh = std::stod(getParamValue(urlString, "kh"));
+      //std::string kh = getParamValue(urlString, "time");
+      Blynk.virtualWrite(V0, kh);//kh
+      Blynk.virtualWrite(V1, ph);//ph
+      Blynk.virtualWrite(V2, current_time);//last time
     }
     if(message.indexOf("KH-MON:")!=-1)
     {
