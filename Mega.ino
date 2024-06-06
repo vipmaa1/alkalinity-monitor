@@ -380,6 +380,9 @@ void loop()
     display_state = 2;
     ph = getPH(50); 
     // ph = getPH(250); 
+    if (s % 2 == 0) {
+      Serial.println("CURRENTPH:"+String(ph,2));
+    }
 
   }
   else
@@ -971,7 +974,6 @@ void runAlkalinityTest()
     time = time + String(t_hour)+ ":";
   if(t_min<10){msg = time + "0";}
     time = time + String(t_min);
-
   Serial.println("API:ph="+String(initial_ph,2)+"&kh="+ String(dkh_std,2)+"&date="+date+"&time="+time+"&");
   delay(1000);
   
