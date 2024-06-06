@@ -3,7 +3,7 @@
 #include <WebServer.h>
 #include "time.h"
 #include <Arduino.h>
-#include <ESP32_MailClient.h>
+//#include <ESP32_MailClient.h>
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 #include <WiFiManager.h>
@@ -17,6 +17,14 @@ WiFiManager wifiMGR;  //WiFiManager object , Local intialization. Once its busin
 
 #define JSON_CONFIG_FILE "/test_config.json"
 bool shouldSaveConfig = false;
+
+bool send_current_ph = true;
+bool send_api_ph = true;
+String api_ph;
+String api_kh;
+char api_time[80];
+String current_ph;
+String last_current_ph;
 // char emailString[50] = "KH.guardian.11@gmail.com" ;
 char emailString[50] = "KH-Guardian@outlook.com";
 
@@ -25,7 +33,7 @@ char emailString[50] = "KH-Guardian@outlook.com";
 #define BLYNK_TEMPLATE_NAME "KH"
 #define BLYNK_AUTH_TOKEN "3KTYu_cVHcIe5HzAfRxP4IgiiTaoQ75H"
 
-#include <BlynkSimpleEsp32.h>
+#include <BlynkSimpleEsp32_SSL.h>
 
 BlynkTimer timer;  // Creating a timer object
 
@@ -242,26 +250,26 @@ WiFiServer server(80);
 #define GMAIL_SMTP_PASSWORD "Guardian@Device"
 #define GMAIL_SMTP_PORT 587
 
-SMTPData data;
+//SMTPData data;
 
-String sendEmail(char *subject, char *sender, char *body, char *recipient, boolean htmlFormat) {
-  data.setLogin(GMAIL_SMTP_SEVER, GMAIL_SMTP_PORT, GMAIL_SMTP_USERNAME, GMAIL_SMTP_PASSWORD);
-  data.setSender(sender, GMAIL_SMTP_USERNAME);
-  data.setSubject(subject);
-  data.setMessage(body, htmlFormat);
-  data.addRecipient(emailString);
-  data.setSendCallback(sendingStatus);
-  // data.setDebug(true);
-  if (!MailClient.sendMail(data))
-    return MailClient.smtpErrorReason();
+// String sendEmail(char *subject, char *sender, char *body, char *recipient, boolean htmlFormat) {
+//   data.setLogin(GMAIL_SMTP_SEVER, GMAIL_SMTP_PORT, GMAIL_SMTP_USERNAME, GMAIL_SMTP_PASSWORD);
+//   data.setSender(sender, GMAIL_SMTP_USERNAME);
+//   data.setSubject(subject);
+//   data.setMessage(body, htmlFormat);
+//   data.addRecipient(emailString);
+//   data.setSendCallback(sendingStatus);
+//   // data.setDebug(true);
+//   if (!MailClient.sendMail(data))
+//     return MailClient.smtpErrorReason();
 
-  return "";
-  data.empty();
-}
+//   return "";
+//   data.empty();
+// }
 // Callback function to get the Email sending status
-void sendingStatus(SendStatus msg) {
-  Serial.println(msg.info());  //--> Print the current status
-}
+// void sendingStatus(SendStatus msg) {
+//   Serial.println(msg.info());  //--> Print the current status
+// }
 
 void Wifi_Status() {
   WiFi.setAutoReconnect(true);
@@ -277,19 +285,131 @@ void Wifi_Status() {
 
 void myTimerEvent()  // This loop defines what happens when timer is triggered
 {
-  time_t now;
-  struct tm *timeinfo;
-  time(&now);
-  timeinfo = localtime(&now);
-  char sendTime[80];
-  strftime(sendTime, 80, "%Y-%m-%d %H:%M:%S", timeinfo);
-  //std::string kh = getParamValue(urlString, "time");
-  Blynk.virtualWrite(V0, 8.00);      //kh
-  Blynk.virtualWrite(V1, 7.56);      //ph
-  Blynk.virtualWrite(V2, sendTime);  //last time
+  HTTPClient http;
+  const char* apiServerUrl = "https://api.spslink.net/api/measurements/";
+  String send_api_ph_str = send_api_ph? "true" : "false";
+  String send_current_ph_str = send_current_ph? "true" : "false";
+  Serial.println("---===---===---");
+  Serial.println("send_api_ph: "+send_api_ph_str);
+  Serial.println("api_kh: "+api_kh);
+  Serial.println("api_ph: "+api_ph);
+  Serial.println("api_time: ");
+  Serial.println(api_time);
+  Serial.println("send_current_ph: "+send_current_ph_str);
+  Serial.println("current_ph: "+current_ph);
+  Serial.println("---===---===---");
+  if(!send_api_ph){
+    Serial.println("---===--==============--===---");
+    Serial.println("send api ph");
+    send_api_ph = true;
+    Blynk.virtualWrite(V0, api_kh);      //kh
+    Blynk.virtualWrite(V1, api_ph);      //ph
+    Blynk.virtualWrite(V2, api_time);  //last time
+     // Construct full URL
+    String fullURL = String(apiServerUrl) + "multi";
+     // Specify content-type header
+    http.begin(fullURL);
+    http.addHeader("Content-Type", "application/json");
+
+    // Create JSON object
+    String jsonData = "{\"ph\": ";
+    jsonData += api_ph;  // Format float with two decimal places
+    jsonData += ", \"kh\": ";
+    jsonData += api_kh;
+    jsonData += "}";
+
+    // Send HTTP POST request
+    int httpResponseCode = http.POST(jsonData);
+
+    // Print response
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println(httpResponseCode);
+      Serial.println(response);
+    } else {
+      Serial.print("Error on sending POST to ");
+      Serial.print(fullURL);
+      Serial.print(": ");
+      Serial.println(httpResponseCode);
+    }
+
+    // Free resources
+    http.end();
+    delay(1000);
+    Serial.println("---===--==============--===---");
+  }
+  if(!send_current_ph && current_ph != last_current_ph){
+    Serial.println("---===--==============--===---");
+    Serial.println("send current ph");
+    send_current_ph = true;
+    last_current_ph = current_ph;
+    Blynk.virtualWrite(V4, current_ph);  //Current ph
+    String fullURL = String(apiServerUrl) + "live";
+     // Specify content-type header
+    http.begin(fullURL);
+    http.addHeader("Content-Type", "application/json");
+
+    // Create JSON object
+    String jsonData = "{\"ph\": ";
+    jsonData += current_ph; 
+    jsonData += "}";
+
+    // Send HTTP POST request
+    int httpResponseCode = http.POST(jsonData);
+
+    // Print response
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println(httpResponseCode);
+      Serial.println(response);
+    } else {
+      Serial.print("Error on sending POST to ");
+      Serial.print(fullURL);
+      Serial.print(": ");
+      Serial.println(httpResponseCode);
+    }
+
+    // Free resources
+    http.end();
+    delay(1000);
+    Serial.println("---===--==============--===---");
+  }
+  // //std::string kh = getParamValue(urlString, "time");
+  // Blynk.virtualWrite(V0, "9.00");      //kh
+  // Blynk.virtualWrite(V1, "8.26");      //ph
+  // Blynk.virtualWrite(V2, sendTime);  //last time
+  Blynk.virtualWrite(V3, millis() / 1000); //Uptime
+  String fullURL = String(apiServerUrl) + "uptime";
+     // Specify content-type header
+    http.begin(fullURL);
+    http.addHeader("Content-Type", "application/json");
+
+    // Create JSON object
+    String jsonData = "{\"time\": ";
+    jsonData += String(millis() / 1000); 
+    jsonData += "}";
+
+    // Send HTTP POST request
+    int httpResponseCode = http.POST(jsonData);
+
+    // Print response
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println(httpResponseCode);
+      Serial.println(response);
+    } else {
+      Serial.print("Error on sending POST to ");
+      Serial.print(fullURL);
+      Serial.print(": ");
+      Serial.println(httpResponseCode);
+    }
+
+    // Free resources
+    http.end();
 }
 
 void setup() {
+  
   timer.setInterval(1000L, myTimerEvent);  //Staring a BlynkTimer
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(LED_Connected, OUTPUT);
@@ -387,7 +507,7 @@ void setup() {
   delay(1000);
   // Server initialization to send email notificaitons
   server.begin();
-  String result = sendEmail("KH Guardian Notification", "KH Guardian", "ESP MCU Started ....", emailString, false);
+  //String result = sendEmail("KH Guardian Notification", "KH Guardian", "ESP MCU Started ....", emailString, false);
 
   delay(100);
   startup_time = millis();
@@ -463,14 +583,24 @@ void loop() {
   // }
 
   if (message != "") {
+       String current_ph_delimiter = "CURRENTPH:";
+    int startIndex = message.indexOf(current_ph_delimiter);
+    if (startIndex != -1) {
+       int delimiterLength = current_ph_delimiter.length();
+       //String(getParamValue(urlString, "API:ph").c_str());
+      current_ph = message.substring(startIndex + delimiterLength);
+      Serial.println("Try read ph");
+      Serial.println(current_ph);
+      send_current_ph = false;
+    }
     if (message.indexOf("API:") != -1) {
       int str_len1 = message.length() + 1;
       char char_array1[str_len1];
       message.toCharArray(char_array1, str_len1);
       Serial.println("Try Send result");
       Serial.println(char_array1);
+      
       HTTPClient http;
-
 
       http.begin("https://spslink.net/save.php");
 
@@ -483,14 +613,22 @@ void loop() {
       Serial.println(httpResponseCode);
       http.end();
 
+      time_t now;
+      struct tm *timeinfo;
+      time(&now);
+      timeinfo = localtime(&now);
+      char sendTime[80];
+      strftime(api_time, 80, "%m-%d %H:%M", timeinfo);
       std::string urlString(char_array1);
 
-      double ph = std::stod(getParamValue(urlString, "API:ph"));
-      double kh = std::stod(getParamValue(urlString, "kh"));
+      api_ph = String(getParamValue(urlString, "API:ph").c_str());
+      api_kh = String(getParamValue(urlString, "kh").c_str());
       //std::string kh = getParamValue(urlString, "time");
-      Blynk.virtualWrite(V0, kh);            //kh
-      Blynk.virtualWrite(V1, ph);            //ph
-      Blynk.virtualWrite(V2, current_time);  //last time
+      Serial.println(api_ph);
+      Serial.println(api_kh);
+      Serial.println(api_time);
+      send_api_ph = false;
+
     }
     if (message.indexOf("KH-MON:") != -1) {
       int str_len = message.length() + 1;
@@ -506,8 +644,8 @@ void loop() {
         }
       }
 
-      String result = sendEmail("KH Guardian Notification", "KH Guardian", char_array, emailString, false);
-      Serial.println(result);
+      //String result = sendEmail("KH Guardian Notification", "KH Guardian", char_array, emailString, false);
+      //Serial.println(result);
 
       // if(result!="") {
       //   Serial.println(result);
@@ -522,8 +660,8 @@ void loop() {
 
 void wire_sendString(String message) {
   Wire.beginTransmission(WIRE_SLAVE_ADDRESS);  // transmit to device #9
-  Wire.write(message.c_str());                 // sends x
-  Wire.endTransmission();                      // stop transmitting
+  Wire.write(reinterpret_cast<const uint8_t*>(message.c_str()), message.length()); // Send string as byte array
+  Wire.endTransmission(); // End transmission
 }
 
 String getNTPTime() {
